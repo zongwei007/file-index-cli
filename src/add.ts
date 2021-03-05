@@ -5,6 +5,7 @@ import {
 } from "https://deno.land/std@0.89.0/path/mod.ts";
 
 import Storage from "./storage.ts";
+import { File } from "./model/mod.ts";
 
 type AddOptions = {
   database: string;
@@ -18,8 +19,6 @@ type WalkOptions = {
 
 interface WalkEntry extends Deno.DirEntry {
   path: string;
-  size?: number;
-  modifiedAt?: Date;
 }
 
 export default function add(options: AddOptions) {
@@ -35,39 +34,30 @@ function addRemotePath(options: AddOptions) {}
 async function addLocalPath(options: Pick<AddOptions, "database" | "src">) {
   const path = await Deno.realPath(options.src);
   const storage = await Storage.create(options.database);
-  const fileSet = await storage.fileSet(path);
+  const folder = await storage.folder(path, true);
+  const folderFiles = new Set<string>();
 
-  for await (const entry of walk(path, {
-    filter: ({ name }) => !name.startsWith("."),
-  })) {
-    if (entry.isFile) {
-      await fileSet.addFile(entry);
-    }
+  for (const file of folder.files || []) {
+    folderFiles.add(file.path);
   }
+
+  const filter = ({ name }: WalkEntry) => !name.startsWith(".");
+
+  for await (const file of walkAllFiles(path, { filter })) {
+    await storage.addFile(folder, file);
+
+    folderFiles.delete(file.path);
+  }
+
+  await storage.removeFileByPath(folder, ...folderFiles);
 
   return storage.close();
 }
 
-async function _createWalkEntry(path: string): Promise<WalkEntry> {
-  path = normalize(path);
-  const name = basename(path);
-  const info = await Deno.stat(path);
-
-  return {
-    path,
-    name,
-    size: info.size,
-    modifiedAt: info.mtime || undefined,
-    isFile: info.isFile,
-    isDirectory: info.isDirectory,
-    isSymlink: info.isSymlink,
-  };
-}
-
-async function* walk(
+async function* walkAllFiles(
   root: string,
   { filter = () => true }: WalkOptions = {}
-): AsyncIterableIterator<WalkEntry> {
+): AsyncIterableIterator<File> {
   for await (const entry of Deno.readDir(root)) {
     const path = join(root, entry.name);
 
@@ -75,16 +65,24 @@ async function* walk(
       continue;
     }
 
-    if (entry.isDirectory && filter({ path, ...entry })) {
-      yield* walk(path, { filter });
-    } else if (entry.isFile) {
-      const walkEntry = await _createWalkEntry(path);
+    const walkEntry = { path, ...entry };
 
+    if (entry.isDirectory && filter(walkEntry)) {
+      yield* walkAllFiles(path, { filter });
+    } else if (entry.isFile) {
       if (filter(walkEntry)) {
-        yield walkEntry;
+        const filePath = normalize(path);
+        const info = await Deno.stat(filePath);
+
+        const file = new File();
+
+        file.name = basename(filePath);
+        file.path = filePath;
+        file.size = info.size;
+        file.lastModified = info.mtime?.getTime();
+
+        yield file;
       }
-    } else if (filter({ path, ...entry })) {
-      yield* walk(path, { filter });
     }
   }
 }

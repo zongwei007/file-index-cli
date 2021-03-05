@@ -1,3 +1,6 @@
+import { format } from "https://deno.land/std@0.89.0/datetime/mod.ts";
+import "https://deno.land/x/humanizer@1.0/byteSize.ts";
+
 import Storage from "./storage.ts";
 
 type SearchOptions = {
@@ -8,8 +11,8 @@ type SearchOptions = {
 type FileOutput = {
   name: string;
   path: string;
-  modifiedAt?: Date;
-  size?: number;
+  modifiedAt?: string;
+  size?: string;
 };
 
 export default async function search(options: SearchOptions) {
@@ -18,15 +21,17 @@ export default async function search(options: SearchOptions) {
   const files = await storage.searchFile(options.key);
 
   const outputs = files.reduce((memo, ele) => {
-    if (!memo[ele.fileSetPath]) {
-      memo[ele.fileSetPath] = [];
+    if (!memo[ele.folder.path]) {
+      memo[ele.folder.path] = [];
     }
 
-    memo[ele.fileSetPath].push({
+    memo[ele.folder.path].push({
       name: ele.name,
       path: ele.path,
-      modifiedAt: ele.modifiedAt,
-      size: ele.size,
+      modifiedAt: ele.lastModified
+        ? format(new Date(ele.lastModified), "yyyy-MM-dd HH:mm:ss")
+        : undefined,
+      size: ele.size ? ele.size.bytes().toString(0) : undefined,
     });
 
     return memo;
