@@ -7,7 +7,7 @@ import { readLines } from "https://deno.land/std@0.89.0/io/mod.ts";
 
 import { File } from "./model/mod.ts";
 
-const LINE_MATCHER = /^(\S+) (\d+) (\S+) (\S+)\s+(\d+) (\d+) (\S+)$/;
+const LINE_MATCHER = /^(\S+) (\d+) (\S+) (\S+)\s+(\d+) (\d+) ([\S\s]+)$/;
 
 interface WalkEntry extends Deno.DirEntry {
   path: string;

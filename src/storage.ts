@@ -1,4 +1,4 @@
-import { ensureFile } from "https://deno.land/std@0.89.0/fs/mod.ts";
+import { ensureFile, exists } from "https://deno.land/std@0.89.0/fs/mod.ts";
 import { connect, Q } from "https://deno.land/x/cotton@v0.7.5/mod.ts";
 import { Adapter } from "https://deno.land/x/cotton@v0.7.5/src/adapters/adapter.ts";
 import { getTableName } from "https://deno.land/x/cotton@v0.7.5/src/utils/models.ts";
@@ -21,49 +21,57 @@ class Storage {
       models: [File, Folder],
     });
 
-    await db.query(
-      "CREATE TABLE IF NOT EXISTS folders (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT, created_at NUMBER, modified_at NUMBER)"
-    );
-    await db.query(
-      "CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, path TEXT, size INTEGER, last_modified NUMBER, created_at NUMBER, folder_id INTEGER)"
-    );
+    if (!(await Deno.stat(dbPath)).size) {
+      await Promise.all(
+        `
+      CREATE TABLE folders (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT, created_at NUMBER, modified_at NUMBER);
+      CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, path TEXT, size INTEGER, last_modified NUMBER, created_at NUMBER, folder_id INTEGER);
+      CREATE UNIQUE INDEX uq_folder IF NOT EXISTS ON folders (path);
+      CREATE UNIQUE INDEX uq_file IF NOT EXISTS ON files (path,folder_id);
+      `
+          .split(";")
+          .map((ele) => ele.trim())
+          .map((ele) => db.query(ele))
+      );
+    }
 
     return new Storage(db);
   };
 
   /** 创建或获取文件集合 */
   public async folder(path: string, withFiles = false): Promise<Folder> {
-    const query = Folder.query().where("path", Q.like(path + "%"));
+    const separator = path.includes("/") ? "/" : "\\";
 
-    const folders = await (withFiles ? query.include("files") : query).all();
+    const folders = await Folder.query().all();
 
-    let folder;
+    let folder = folders.find((ele) => ele.path === path);
 
-    if (
-      !folders.length ||
-      folders.every((ele) => ele.path.length > path.length)
-    ) {
-      folder = new Folder();
-      folder.path = path;
-
-      await folder.save();
-
-      if (folders.length) {
-        await this.db
-          .table(getTableName(File))
-          .where("folder_id", Q.in(folders.map((ele) => ele.id)))
-          .update({ folder_id: folder.id })
-          .execute();
-
-        await Promise.all(folders.map((ele) => ele.remove()));
-      }
-    } else {
-      folder = await Folder.query().where("path", Q.eq(path)).first();
-    }
-
+    // 如果匹配目录不存在
     if (!folder) {
-      throw Error(`Folder ${path} is not found`);
+      // 试试匹配父级
+      folder = folders.find((ele) => path.startsWith(ele.path + separator));
+
+      // 父级不存在，则创建新的目录
+      if (!folder) {
+        folder = new Folder();
+        folder.path = path;
+
+        await folder.save();
+      }
     }
+
+    //父级创建后，将所有子集目录下的数据收归自身名下
+    const children = folders.filter((ele) =>
+      ele.path.startsWith(folder!.path + separator)
+    );
+
+    await this.db
+      .table(getTableName(File))
+      .where("folder_id", Q.in(children.map((ele) => ele.id)))
+      .update({ folder_id: folder.id })
+      .execute();
+
+    await Promise.all(children.map((child) => child.remove()));
 
     return folder;
   }
@@ -91,12 +99,14 @@ class Storage {
   }
 
   public async removeFileByPath(folder: Folder, ...path: string[]) {
-    return await this.db
-      .table(getTableName(File))
-      .where("folder_id", Q.eq(folder.id))
-      .where("path", Q.in(path))
-      .delete()
-      .execute();
+    while (path.length) {
+      await this.db
+        .table(getTableName(File))
+        .where("folder_id", Q.eq(folder.id))
+        .where("path", Q.in(path.splice(0, 100)))
+        .delete()
+        .execute();
+    }
   }
 
   public async searchFile(key: string): Promise<File[]> {

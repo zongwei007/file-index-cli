@@ -18,7 +18,9 @@ export default async function add(options: AddOptions) {
     folderFiles.add(file.path);
   }
 
-  for await (const file of walker.walk(({ name }) => !name.startsWith("."))) {
+  for await (const file of walker.walk(
+    ({ name }) => !name.startsWith(".") && name !== "node_modules"
+  )) {
     await storage.addFile(folder, file);
 
     folderFiles.delete(file.path);
