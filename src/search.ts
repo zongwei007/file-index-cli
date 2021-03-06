@@ -29,7 +29,7 @@ export default async function search(options: SearchOptions) {
       name: ele.name,
       path: ele.path,
       modifiedAt: ele.lastModified
-        ? format(new Date(ele.lastModified), "yyyy-MM-dd HH:mm:ss")
+        ? format(new Date(ele.lastModified * 1000), "yyyy-MM-dd HH:mm:ss")
         : undefined,
       size: ele.size ? ele.size.bytes().toString(0) : undefined,
     });
