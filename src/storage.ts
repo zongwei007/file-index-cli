@@ -32,35 +32,37 @@ class Storage {
   };
 
   /** 创建或获取文件集合 */
-  public async folder(path: string, withFiles = false) {
-    const separator = path.includes("/") ? "/" : "\\";
+  public async folder(path: string, withFiles = false): Promise<Folder> {
+    const query = Folder.query().where("path", Q.like(path + "%"));
 
-    const paths = path
-      .split(/[/\\]/)
-      .reduce(
-        (memo, _ele, index, array) => [
-          ...memo,
-          array.slice(0, index + 1).join(separator),
-        ],
-        [] as string[]
-      );
+    const folders = await (withFiles ? query.include("files") : query).all();
 
-    const query = Folder.query().where("path", Q.in(paths));
+    let folder;
 
-    let folder = await (withFiles ? query.include("files") : query).first();
-
-    if (folder) {
-      if (folder.path.length > path.length) {
-        folder.path = path;
-        folder.modifiedAt = Date.now();
-
-        await folder.save();
-      }
-    } else {
+    if (
+      !folders.length ||
+      folders.every((ele) => ele.path.length > path.length)
+    ) {
       folder = new Folder();
       folder.path = path;
 
       await folder.save();
+
+      if (folders.length) {
+        await this.db
+          .table(getTableName(File))
+          .where("folder_id", Q.in(folders.map((ele) => ele.id)))
+          .update({ folder_id: folder.id })
+          .execute();
+
+        await Promise.all(folders.map((ele) => ele.remove()));
+      }
+    } else {
+      folder = await Folder.query().where("path", Q.eq(path)).first();
+    }
+
+    if (!folder) {
+      throw Error(`Folder ${path} is not found`);
     }
 
     return folder;
@@ -89,16 +91,12 @@ class Storage {
   }
 
   public async removeFileByPath(folder: Folder, ...path: string[]) {
-    const result = await this.db
+    return await this.db
       .table(getTableName(File))
       .where("folder_id", Q.eq(folder.id))
       .where("path", Q.in(path))
       .delete()
       .execute();
-
-    console.log(result);
-
-    return result;
   }
 
   public async searchFile(key: string): Promise<File[]> {
