@@ -15,6 +15,7 @@ interface WalkEntry extends Deno.DirEntry {
 
 export interface Walker {
   root: string;
+  path: string;
 
   walk: (filter: (entry: WalkEntry) => boolean) => AsyncIterableIterator<File>;
 }
@@ -120,10 +121,11 @@ class CommanderWalker implements Walker {
 }
 
 class LocalWalker implements Walker {
+  path: string;
   root: string;
 
   constructor(root: string) {
-    this.root = Deno.realPathSync(root);
+    this.path = this.root = Deno.realPathSync(root);
   }
 
   async *walk(

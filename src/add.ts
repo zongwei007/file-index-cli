@@ -12,21 +12,17 @@ export default async function add(options: AddOptions) {
   const walker = createWalker(options.src);
 
   const folder = await storage.folder(walker.root);
-  const folderFiles = new Set<string>();
-
-  for (const file of folder.files || []) {
-    folderFiles.add(file.path);
-  }
+  const folderFiles = [];
 
   for await (const file of walker.walk(
     ({ name }) => !name.startsWith(".") && name !== "node_modules"
   )) {
     await storage.addFile(folder, file);
 
-    folderFiles.delete(file.path);
+    folderFiles.push(file.path);
   }
 
-  await storage.removeFileByPath(folder, ...folderFiles);
+  await storage.clearFiles(folder, walker.root, folderFiles);
 
   return storage.close();
 }

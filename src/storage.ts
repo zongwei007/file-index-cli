@@ -98,12 +98,24 @@ class Storage {
     return result;
   }
 
-  public async removeFileByPath(folder: Folder, ...path: string[]) {
-    while (path.length) {
+  public async clearFiles(folder: Folder, parent: string, includes: string[]) {
+    const exists = new Set(
+      (
+        await File.query()
+          .where("path", Q.like(parent + "/%"))
+          .all()
+      ).map((ele) => ele.path)
+    );
+
+    includes.forEach((ele) => exists.delete(ele));
+
+    const removed = [...exists];
+
+    while (removed.length) {
       await this.db
         .table(getTableName(File))
         .where("folder_id", Q.eq(folder.id))
-        .where("path", Q.in(path.splice(0, 100)))
+        .where("path", Q.in(removed.splice(0, 100)))
         .delete()
         .execute();
     }
