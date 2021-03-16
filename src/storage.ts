@@ -1,7 +1,7 @@
-import { ensureFile, exists } from "https://deno.land/std@0.89.0/fs/mod.ts";
-import { connect, Q } from "https://deno.land/x/cotton@v0.7.5/mod.ts";
-import { Adapter } from "https://deno.land/x/cotton@v0.7.5/src/adapters/adapter.ts";
-import { getTableName } from "https://deno.land/x/cotton@v0.7.5/src/utils/models.ts";
+import { connect, Q } from "cotton";
+import { Adapter } from "cotton/src/adapters/adapter.ts";
+import { getTableName } from "cotton/src/utils/models.ts";
+import { ensureFile } from "fs";
 
 import logger from "./logger.ts";
 import { File, Folder } from "./model/mod.ts";
@@ -16,7 +16,7 @@ class Storage {
   }
 
   /** 创建或获取文件集合 */
-  public async folder(path: string, withFiles = false): Promise<Folder> {
+  public async folder(path: string): Promise<Folder> {
     const separator = path.includes("/") ? "/" : "\\";
 
     const folders = await Folder.query().all();

@@ -1,6 +1,7 @@
 {
-    "deno.enable": true,
-    "deno.lint": true,
-    "deno.unstable": false,
-    "debug.javascript.unmapMissingSources": true,
+  "deno.enable": true,
+  "deno.lint": true,
+  "deno.unstable": true,
+  "deno.importMap": "./import_map.json",
+  "debug.javascript.unmapMissingSources": true,
 }

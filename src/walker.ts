@@ -1,9 +1,5 @@
-import {
-  basename,
-  join,
-  normalize,
-} from "https://deno.land/std@0.89.0/path/mod.ts";
-import { readLines } from "https://deno.land/std@0.89.0/io/mod.ts";
+import { join, normalize, basename } from "path";
+import { readLines } from "io";
 
 import logger from "./logger.ts";
 import { File } from "./model/mod.ts";

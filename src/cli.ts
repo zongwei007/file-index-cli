@@ -1,6 +1,6 @@
-import Denomander from "https://deno.land/x/denomander/mod.ts";
-import osPaths from "https://deno.land/x/os_paths@v6.9.0/src/mod.deno.ts";
-import { join } from "https://deno.land/std@0.89.0/path/mod.ts";
+import Denomander from "denomander";
+import { join } from "path";
+import osPaths from "os_paths";
 
 import add from "./add.ts";
 import search from "./search.ts";

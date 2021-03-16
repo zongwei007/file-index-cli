@@ -1,11 +1,4 @@
-import {
-  BaseModel,
-  Column,
-  DataType,
-  HasMany,
-  Model,
-  Primary,
-} from "https://deno.land/x/cotton@v0.7.5/mod.ts";
+import { BaseModel, Column, HasMany, Model, Primary } from "cotton";
 
 import File from "./File.ts";
 

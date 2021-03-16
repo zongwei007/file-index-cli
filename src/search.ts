@@ -1,5 +1,5 @@
-import { format } from "https://deno.land/std@0.89.0/datetime/mod.ts";
-import "https://deno.land/x/humanizer@1.0/byteSize.ts";
+import { format } from "datetime";
+import convertSize from "convert_size";
 
 import { createStorage } from "./storage.ts";
 
@@ -31,7 +31,7 @@ export default async function search(options: SearchOptions) {
       modifiedAt: ele.lastModified
         ? format(new Date(ele.lastModified * 1000), "yyyy-MM-dd HH:mm:ss")
         : undefined,
-      size: ele.size ? ele.size.bytes().toString(0) : undefined,
+      size: ele.size ? convertSize(ele.size, { accuracy: 1 }) : undefined,
     });
 
     return memo;

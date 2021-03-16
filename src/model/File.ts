@@ -1,11 +1,4 @@
-import {
-  BaseModel,
-  BelongsTo,
-  Column,
-  DataType,
-  Model,
-  Primary,
-} from "https://deno.land/x/cotton@v0.7.5/mod.ts";
+import { BaseModel, BelongsTo, Column, Model, Primary } from "cotton";
 
 import Folder from "./Folder.ts";
 
