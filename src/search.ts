@@ -1,5 +1,6 @@
 import { format } from "datetime";
 import convertSize from "convert_size";
+import { createRequire } from "node/module.ts";
 
 import { createStorage } from "./storage.ts";
 
@@ -14,6 +15,9 @@ type FileOutput = {
   modifiedAt?: string;
   size?: string;
 };
+
+const require = createRequire(import.meta.url);
+const cliFormat = require("cli-format");
 
 export default async function search(options: SearchOptions) {
   const storage = await createStorage(options.database);
@@ -37,10 +41,56 @@ export default async function search(options: SearchOptions) {
     return memo;
   }, {} as { [fileSetPath: string]: Array<FileOutput> });
 
+  const { columns } = Deno.consoleSize(Deno.stdout.rid);
+
+  const timeWidth = 21;
+  const sizeWidth = 10;
+  const restWidth = columns - 5 - timeWidth - sizeWidth;
+  const nameWidth = Math.ceil(restWidth * (columns > 140 ? 0.3 : 0.4)) - 2;
+  const pathWidth = restWidth - nameWidth - 2;
+
+  const lineSeparator = new Array(columns).fill("-").join("");
+
   Object.entries(outputs).forEach(([fileSetPath, files]) => {
     console.log(fileSetPath);
+    console.log(new Array(columns).fill("=").join(""));
 
-    console.table(files);
+    files.forEach((file, index, array) => {
+      console.log(
+        cliFormat.columns.wrap(
+          [
+            {
+              content: file.name,
+              width: nameWidth,
+            },
+            {
+              content: file.path,
+              width: pathWidth,
+            },
+            {
+              content: file.modifiedAt,
+              width: 19,
+            },
+            {
+              content: (file.size || "").padStart(8, " "),
+              width: 8,
+            },
+          ],
+          {
+            width: columns - 4,
+            paddingMiddle: " | ",
+          }
+        )
+      );
+
+      if (index < array.length - 1) {
+        console.log(lineSeparator);
+      }
+    });
+
+    console.log(new Array(columns).fill("=").join(""));
+    console.log("total: %d", files.length);
+    console.log("");
   });
 
   return storage.close();
