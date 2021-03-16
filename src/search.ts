@@ -1,7 +1,7 @@
 import { format } from "https://deno.land/std@0.89.0/datetime/mod.ts";
 import "https://deno.land/x/humanizer@1.0/byteSize.ts";
 
-import Storage from "./storage.ts";
+import { createStorage } from "./storage.ts";
 
 type SearchOptions = {
   key: string;
@@ -16,7 +16,7 @@ type FileOutput = {
 };
 
 export default async function search(options: SearchOptions) {
-  const storage = await Storage.create(options.database);
+  const storage = await createStorage(options.database);
 
   const files = await storage.searchFile(options.key);
 

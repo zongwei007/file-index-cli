@@ -3,40 +3,17 @@ import { connect, Q } from "https://deno.land/x/cotton@v0.7.5/mod.ts";
 import { Adapter } from "https://deno.land/x/cotton@v0.7.5/src/adapters/adapter.ts";
 import { getTableName } from "https://deno.land/x/cotton@v0.7.5/src/utils/models.ts";
 
+import logger from "./logger.ts";
 import { File, Folder } from "./model/mod.ts";
 
 class Storage {
   private db: Adapter;
+  private dryRun: boolean;
 
-  constructor(db: Adapter) {
+  constructor(db: Adapter, dryRun: boolean) {
     this.db = db;
+    this.dryRun = dryRun;
   }
-
-  static create = async function (dbPath: string) {
-    await ensureFile(dbPath);
-
-    const db = await connect({
-      type: "sqlite",
-      database: dbPath,
-      models: [File, Folder],
-    });
-
-    if (!(await Deno.stat(dbPath)).size) {
-      await Promise.all(
-        `
-      CREATE TABLE folders (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT, created_at NUMBER, modified_at NUMBER);
-      CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, path TEXT, size INTEGER, last_modified NUMBER, created_at NUMBER, folder_id INTEGER);
-      CREATE UNIQUE INDEX uq_folder IF NOT EXISTS ON folders (path);
-      CREATE UNIQUE INDEX uq_file IF NOT EXISTS ON files (path,folder_id);
-      `
-          .split(";")
-          .map((ele) => ele.trim())
-          .map((ele) => db.query(ele))
-      );
-    }
-
-    return new Storage(db);
-  };
 
   /** 创建或获取文件集合 */
   public async folder(path: string, withFiles = false): Promise<Folder> {
@@ -87,12 +64,21 @@ class Storage {
         result.size = file.size;
         result.lastModified = file.lastModified;
 
-        await result.save();
+        logger.debug("更新文件 %s", file.path);
+
+        if (!this.dryRun) {
+          await result.save();
+        }
       }
     } else {
       result = file;
       result.folder = folder;
-      await result.save();
+
+      logger.debug("新增文件 %s", file.path);
+
+      if (!this.dryRun) {
+        await result.save();
+      }
     }
 
     return result;
@@ -111,7 +97,7 @@ class Storage {
 
     const removed = [...exists];
 
-    while (removed.length) {
+    while (!this.dryRun && removed.length) {
       await this.db
         .table(getTableName(File))
         .where("folder_id", Q.eq(folder.id))
@@ -119,6 +105,8 @@ class Storage {
         .delete()
         .execute();
     }
+
+    removed.forEach((ele) => logger.debug("删除文件 %s", ele));
   }
 
   public async searchFile(key: string): Promise<File[]> {
@@ -133,4 +121,32 @@ class Storage {
   }
 }
 
-export default Storage;
+export async function createStorage(dbPath: string, dryRun = false) {
+  await ensureFile(dbPath);
+
+  const db = await connect({
+    type: "sqlite",
+    database: dbPath,
+    models: [File, Folder],
+  });
+
+  if (!(await Deno.stat(dbPath)).size) {
+    logger.debug("初始化数据库");
+
+    await Promise.all(
+      `
+    CREATE TABLE folders (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT, created_at NUMBER, modified_at NUMBER);
+    CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, path TEXT, size INTEGER, last_modified NUMBER, created_at NUMBER, folder_id INTEGER);
+    CREATE UNIQUE INDEX uq_folder IF NOT EXISTS ON folders (path);
+    CREATE UNIQUE INDEX uq_file IF NOT EXISTS ON files (path,folder_id);
+    `
+        .split(";")
+        .map((ele) => ele.trim())
+        .map((ele) => db.query(ele))
+    );
+
+    logger.debug("初始化数据库完毕");
+  }
+
+  return new Storage(db, dryRun);
+}

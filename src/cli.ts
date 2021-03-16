@@ -19,11 +19,12 @@ const program = new Denomander({
 program
   .command("add [src]")
   .description("添加路径到索引数据库")
-  .option("-p, --password", "访问密码，用于 ssh 协议")
+  .option("--dry-run", "空运行，不操作数据库")
   .action((args: { src: string }) =>
     add({
       database: program.database || defaultDatabasePath,
-      password: program.password,
+      dryRun: "dry-run" in program,
+      verbose: "verbose" in program,
       ...args,
     })
   );
@@ -42,5 +43,7 @@ program.globalOption(
   "-db, --database",
   "索引数据库存储路径，默认为：~/.file-index/database.db"
 );
+
+program.globalOption("--verbose", "输出调试信息");
 
 export default program;

@@ -5,6 +5,7 @@ import {
 } from "https://deno.land/std@0.89.0/path/mod.ts";
 import { readLines } from "https://deno.land/std@0.89.0/io/mod.ts";
 
+import logger from "./logger.ts";
 import { File } from "./model/mod.ts";
 
 const LINE_MATCHER = /^(\S+) (\d+) (\S+) (\S+)\s+(\d+) (\d+) ([\S\s]+)$/;
@@ -46,7 +47,7 @@ class CommanderWalker implements Walker {
   ): AsyncIterableIterator<File> {
     const command = `ssh ${this.user}@${this.host} sudo ls -R -l --time-style +%s ${this.path} > .swap.tmp`;
 
-    console.log("Execute command：%s", command);
+    logger.debug("Execute command：%s", command);
 
     const p = Deno.run({
       cmd: ["cmd", "/C", command],
@@ -86,12 +87,15 @@ class CommanderWalker implements Walker {
         };
 
         if (ignoreFolders.some((path) => entry.path.startsWith(path))) {
+          logger.debug("忽略路径 %s", entry.path);
           continue;
         }
 
         if (entry.isDirectory) {
           // 写入目录忽略信息
           if (!filter(entry)) {
+            logger.debug("忽略路径 %s", entry.path);
+
             ignoreFolders.push(entry.path);
           }
 
@@ -107,6 +111,8 @@ class CommanderWalker implements Walker {
           file.path = entry.path;
 
           yield file;
+        } else {
+          logger.debug("忽略文件 %s", entry.path);
         }
       }
     } else {
@@ -148,8 +154,12 @@ async function* walkAllFiles(
 
     const walkEntry = { path, ...entry };
 
-    if (entry.isDirectory && filter(walkEntry)) {
-      yield* walkAllFiles(path, filter);
+    if (entry.isDirectory) {
+      if (filter(walkEntry)) {
+        yield* walkAllFiles(path, filter);
+      } else {
+        logger.debug("忽略路径 %s", walkEntry.path);
+      }
     } else if (entry.isFile) {
       if (filter(walkEntry)) {
         const filePath = normalize(path);
@@ -163,6 +173,8 @@ async function* walkAllFiles(
         file.lastModified = info.mtime?.getTime();
 
         yield file;
+      } else {
+        logger.debug("忽略文件 %s", walkEntry.path);
       }
     }
   }
