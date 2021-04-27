@@ -1,10 +1,11 @@
 {
   "imports": {
-    "path": "https://deno.land/std@0.89.0/path/mod.ts",
-    "datetime": "https://deno.land/std@0.89.0/datetime/mod.ts",
-    "fs": "https://deno.land/std@0.89.0/fs/mod.ts",
-    "io": "https://deno.land/std@0.89.0/io/mod.ts",
-    "node/": "https://deno.land/std@0.89.0/node/",
+    "cli-format": "https://raw.githubusercontent.com/zongwei007/cli-format-deno/master/src/mod.ts",
+    "path": "https://deno.land/std@0.95.0/path/mod.ts",
+    "datetime": "https://deno.land/std@0.95.0/datetime/mod.ts",
+    "fs": "https://deno.land/std@0.95.0/fs/mod.ts",
+    "io": "https://deno.land/std@0.95.0/io/mod.ts",
+    "node/": "https://deno.land/std@0.95.0/node/",
     "cotton": "https://deno.land/x/cotton@v0.7.5/mod.ts",
     "cotton/": "https://deno.land/x/cotton@v0.7.5/",
     "denomander": "https://deno.land/x/denomander@0.8.1/mod.ts",

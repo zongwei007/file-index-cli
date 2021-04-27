@@ -1,8 +1,9 @@
 import { format } from "datetime";
 import convertSize from "convert_size";
-import { createRequire } from "node/module.ts";
 
 import { createStorage } from "./storage.ts";
+
+import cliFormat from "cli-format";
 
 type SearchOptions = {
   key: string;
@@ -15,9 +16,6 @@ type FileOutput = {
   modifiedAt?: string;
   size?: string;
 };
-
-const require = createRequire(import.meta.url);
-const cliFormat = require("cli-format");
 
 export default async function search(options: SearchOptions) {
   const storage = await createStorage(options.database);
@@ -33,7 +31,7 @@ export default async function search(options: SearchOptions) {
       name: ele.name,
       path: ele.path,
       modifiedAt: ele.lastModified
-        ? format(new Date(ele.lastModified * 1000), "yyyy-MM-dd HH:mm:ss")
+        ? format(new Date(ele.lastModified), "yyyy-MM-dd HH:mm:ss")
         : undefined,
       size: ele.size ? convertSize(ele.size, { accuracy: 1 }) : undefined,
     });
