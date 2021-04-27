@@ -102,7 +102,7 @@ class CommanderWalker implements Walker {
         if (filter(entry)) {
           const file = new File();
           file.size = parseInt(groups[5]);
-          file.lastModified = parseInt(groups[6]);
+          file.lastModified = parseInt(groups[6]) * 1000;
           file.name = entry.name;
           file.path = entry.path;
 
