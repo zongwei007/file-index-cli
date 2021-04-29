@@ -17,7 +17,7 @@ class Folder extends BaseModel {
   createdAt!: number;
 
   @Column({ name: "modified_at", default: () => Date.now() })
-  modifiedAt?: number;
+  modifiedAt!: number;
 }
 
 export default Folder;

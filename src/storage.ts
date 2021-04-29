@@ -1,7 +1,8 @@
 import { connect, Q } from "cotton";
-import { Adapter } from "cotton/src/adapters/adapter.ts";
 import { getTableName } from "cotton/src/utils/models.ts";
 import { ensureFile } from "fs";
+
+import type { Adapter } from "cotton/src/adapters/adapter.ts";
 
 import logger from "./logger.ts";
 import { File, Folder } from "./model/mod.ts";
@@ -107,6 +108,12 @@ class Storage {
     }
 
     removed.forEach((ele) => logger.debug("删除文件 %s", ele));
+  }
+
+  public async searchFolder(key = ""): Promise<Folder[]> {
+    return await Folder.query()
+      .where("path", Q.like(`%${key}%`))
+      .all();
   }
 
   public async searchFile(key: string): Promise<File[]> {

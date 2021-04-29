@@ -17,6 +17,8 @@
         "--unstable",
         "-A",
         "mod.ts",
+        "search",
+        "Fate"
       ],
       "attachSimplePort": 9229
     }

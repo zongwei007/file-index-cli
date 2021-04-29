@@ -1,6 +1,6 @@
 {
   "imports": {
-    "cli-format": "https://raw.githubusercontent.com/zongwei007/cli-format-deno/master/src/mod.ts",
+    "cli-format": "https://deno.land/x/cli_format_deno@3.0.10/src/mod.ts",
     "path": "https://deno.land/std@0.95.0/path/mod.ts",
     "datetime": "https://deno.land/std@0.95.0/datetime/mod.ts",
     "fs": "https://deno.land/std@0.95.0/fs/mod.ts",

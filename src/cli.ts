@@ -4,6 +4,7 @@ import osPaths from "os_paths";
 
 import add from "./add.ts";
 import search from "./search.ts";
+import { listFolders } from "./list.ts";
 
 const defaultDatabasePath = join(
   osPaths.home() || ".",
@@ -15,6 +16,16 @@ const program = new Denomander({
   app_description: "简易文件索引命令",
   app_version: "1.0.0",
 });
+
+program
+  .command("folders [key?]")
+  .description("查看已添加的路径")
+  .action((args: { key?: string }) => {
+    listFolders({
+      database: program.database || defaultDatabasePath,
+      ...args,
+    });
+  });
 
 program
   .command("add [src]")
