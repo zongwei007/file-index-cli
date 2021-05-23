@@ -37,12 +37,12 @@ class File {
   ): File[] {
     const sql = `
       SELECT
-        t0.id, t0.name, t0.path, t0.size, t0.last_modified, t0.created_at, t0.modified_at,
-        t1.id as did, t1.path as dpath, t1.created_at as dca, t1.modified_at as dma
+        files.id, files.name, files.path, files.size, files.last_modified, files.created_at, files.modified_at,
+        folders.id as did, folders.path as dpath, folders.created_at as dca, folders.modified_at as dma
       FROM
-        files as t0
+        files
       LEFT JOIN
-        folders as t1 ON t0.folder_id = t1.id
+        folders ON files.folder_id = folders.id
       ${cnd ? "WHERE " + cnd : ""}
     `;
 

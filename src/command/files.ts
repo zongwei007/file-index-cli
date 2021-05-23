@@ -6,7 +6,7 @@ import { printTable } from "../print.ts";
 import type { TableColumn } from "../print.ts";
 
 type SearchOptions = {
-  key: string;
+  keywords: string[];
 };
 
 type FileOutput = {
@@ -17,9 +17,14 @@ type FileOutput = {
 };
 
 export function search(options: SearchOptions) {
-  const files = File.query(options.key ? "t0.path like ?" : undefined, [
-    `%${options.key}%`,
-  ]);
+  const cnds =
+    new Array(options.keywords.length).fill("files.path like ?").join(" AND ") ||
+    undefined;
+
+  const files = File.query(
+    cnds,
+    cnds ? options.keywords.map((w) => `%${w}%`) : undefined
+  );
 
   const outputs = files.reduce<{ [fileSetPath: string]: Array<FileOutput> }>(
     (memo, ele) => {

@@ -130,7 +130,7 @@ class Folder {
   }
 
   private addFile(file: File) {
-    let [result] = File.query("t0.path = ?", [file.path]);
+    let [result] = File.query("files.path = ?", [file.path]);
 
     if (result) {
       if (
@@ -158,7 +158,7 @@ class Folder {
 
   private clearFiles(parent: string, includes: string[]) {
     const exists = new Set(
-      File.query("t0.path like ? AND folder_id = ?", [
+      File.query("files.path like ? AND folder_id = ?", [
         parent + "/%",
         this.id,
       ]).map((ele) => ele.path)

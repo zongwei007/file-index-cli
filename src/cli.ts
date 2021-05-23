@@ -61,12 +61,12 @@ folder
   });
 
 program
-  .command("search [key]")
+  .command("search [keywords...]")
   .description("按关键字检索文件")
-  .action((key: string) => {
+  .action((keywords: string) => {
     const { database, ...opts } = program.opts();
 
-    return withDatabase(database, () => files.search({ ...opts, key }));
+    return withDatabase(database, () => files.search({ ...opts, keywords }));
   });
 
 program.option(
