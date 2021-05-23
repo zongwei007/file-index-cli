@@ -37,12 +37,24 @@ folder
   .command("list")
   .alias("ls")
   .description("查看已索引的根目录")
-  .option("-path, --pathInclude <search>", "查询路径包含输入值的根目录")
+  .option("-f, --filter <path>", "按路径过滤")
   .action((args: Command) => {
     const { database, ...opts } = program.opts();
 
     return withDatabase(database, () =>
-      folders.list({ ...opts, key: args.pathInclude })
+      folders.list({ ...opts, key: args.path })
+    );
+  });
+
+folder
+  .command("diff <src> <target>")
+  .description("比较目录差异")
+  .option("-t, --type <type>", "筛选差异类型")
+  .action((src: string, target: string, args: Command) => {
+    const { database, ...opts } = program.opts();
+
+    return withDatabase(database, () =>
+      folders.diff({ ...opts, src, target, type: args.type })
     );
   });
 

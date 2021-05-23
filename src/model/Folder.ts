@@ -60,6 +60,42 @@ class Folder {
     ]);
   }
 
+  diff(target: Folder, srcPath: string, targetPath: string) {
+    const reducer = (path: string) => (memo: Map<string, File>, file: File) => {
+      memo.set(file.path.substring(path.length + 1), file);
+      return memo;
+    };
+
+    const srcFiles = File.query("folder_id = ? AND files.path like ?", [
+      this.id,
+      `${srcPath}%`,
+    ]).reduce(reducer(srcPath), new Map<string, File>());
+
+    const targetFiles = File.query("folder_id = ? AND files.path like ?", [
+      target.id,
+      `${targetPath}%`,
+    ]).reduce(reducer(targetPath), new Map<string, File>());
+
+    const addFiles = [];
+    const removeFiles = [];
+
+    for (const [path, file] of srcFiles.entries()) {
+      if (!targetFiles.has(path)) {
+        file.path = path;
+        addFiles.push(file);
+      }
+    }
+
+    for (const [path, file] of targetFiles.entries()) {
+      if (!srcFiles.has(path)) {
+        file.path = path;
+        removeFiles.push(file);
+      }
+    }
+
+    return [addFiles, removeFiles];
+  }
+
   merge(...folders: Folder[]) {
     const sql = `UPDATE files SET path = (? || ? || path), folder_id = ? WHERE folder_id = ?`;
     const updater = getDatabase().prepareQuery(sql);
@@ -130,12 +166,15 @@ class Folder {
   }
 
   private addFile(file: File) {
-    let [result] = File.query("files.path = ?", [file.path]);
+    let [result] = File.query("files.path = ? AND folder_id = ?", [
+      file.path,
+      this.id,
+    ]);
 
     if (result) {
       if (
         result.size !== file.size ||
-        result.lastModified !== file.lastModified
+        result.lastModified.getTime() !== file.lastModified.getTime()
       ) {
         result.size = file.size;
         result.lastModified = file.lastModified;

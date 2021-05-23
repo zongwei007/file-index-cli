@@ -1,8 +1,16 @@
-import { Folder } from "../model/mod.ts";
-import { createWalker } from "../walker.ts";
+import convertSize from "convert_size";
+
+import { File, Folder } from "../model/mod.ts";
+import { createWalker, prunePath } from "../walker.ts";
 import { printTable } from "../print.ts";
 
 import type { TableColumn } from "../print.ts";
+
+type DiffOptions = {
+  src: string;
+  target: string;
+  type?: "add" | "remove";
+};
 
 type IndexOptions = {
   path: string;
@@ -16,6 +24,68 @@ type MoveOptions = {
   src: string;
   target: string;
 };
+
+export function diff(options: DiffOptions) {
+  const folders = Folder.query();
+  const src = folders.find((ele) => options.src.startsWith(ele.path));
+  const target = folders.find((ele) => options.target.startsWith(ele.path));
+
+  if (!src) {
+    throw new Error(`Folder ${options.src} is not found`);
+  }
+
+  if (!target) {
+    throw new Error(`Folder ${options.target} is not found`);
+  }
+
+  const srcPath = prunePath(options.src.substring(src.path.length + 1));
+  const targetPath = prunePath(
+    options.target.substring(target.path.length + 1)
+  );
+
+  const [addFiles, removeFiles] = src.diff(target, srcPath, targetPath);
+
+  const { columns: screenWidth } = Deno.consoleSize(Deno.stdout.rid);
+
+  const columns: TableColumn[] = [
+    {
+      name: "type",
+      width: 6,
+    },
+    {
+      name: "name",
+      width: Math.ceil(screenWidth * (screenWidth > 140 ? 0.2 : 0.3)),
+    },
+    {
+      name: "path",
+    },
+    {
+      name: "modifiedAt",
+      width: 19,
+    },
+    {
+      name: "size",
+      width: 8,
+      align: "right",
+    },
+  ];
+
+  const outputType = options.type ? [options.type] : ["add", "remove"];
+  const mapper = (type: string) => (file: File) => ({
+    type,
+    name: file.name,
+    path: file.path,
+    modifiedAt: file.lastModified,
+    size: file.size ? convertSize(file.size, { accuracy: 1 }) : "",
+  });
+
+  printTable(columns, [
+    ...(outputType.includes("add") ? addFiles.map(mapper("add")) : []),
+    ...(outputType.includes("remove") ? removeFiles.map(mapper("remove")) : []),
+  ]);
+
+  return Promise.resolve();
+}
 
 export async function index(options: IndexOptions) {
   const walker = await createWalker(options.path);
