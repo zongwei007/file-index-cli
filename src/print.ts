@@ -37,7 +37,7 @@ export function printTable<
 
   const lineSeparator = new Array(screenWidth).fill("-").join("");
 
-  console.log(new Array(screenWidth).fill("=").join(""));
+  console.log(new Array(screenWidth).fill("─").join(""));
 
   data.forEach((row, index, array) => {
     console.log(
@@ -55,5 +55,5 @@ export function printTable<
     }
   });
 
-  console.log(new Array(screenWidth).fill("=").join(""));
+  console.log(new Array(screenWidth).fill("─").join(""));
 }

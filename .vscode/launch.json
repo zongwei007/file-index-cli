@@ -3,24 +3,26 @@
   "configurations": [
     {
       "name": "Debug Deno (Allow All)",
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "deno",
       "runtimeArgs": [
         "run",
-        "--config",
-        "./tsconfig.json",
-        "--import-map",
-        "./import_map.json",
-        "--inspect-brk",
         "--unstable",
+        "--config",
+        "tsconfig.json",
+        "--import-map",
+        "import_map.json",
+        "--inspect-brk",
         "-A",
         "mod.ts",
-        "search",
-        "Fate"
-      ],
-      "attachSimplePort": 9229
+        "folder",
+        "index",
+        "E:\\TEMP",
+        "--dry-run",
+        "--verbose"
+      ]
     }
   ]
 }

@@ -1,60 +1,83 @@
-import Denomander from "denomander";
+import { Command } from "cmd";
 import { join } from "path";
 import osPaths from "os_paths";
 
-import add from "./add.ts";
-import search from "./search.ts";
-import { listFolders } from "./list.ts";
+import * as folders from "./command/folders.ts";
+import * as files from "./command/files.ts";
+import { withDatabase } from "./storage.ts";
 
 const defaultDatabasePath = join(
   osPaths.home() || ".",
   ".file-index/database.db"
 );
 
-const program = new Denomander({
-  app_name: "File Index CLI",
-  app_description: "简易文件索引命令",
-  app_version: "1.0.0",
-});
+const program = new Command();
 
-program
-  .command("folders [key?]")
-  .description("查看已添加的路径")
-  .action((args: { key?: string }) => {
-    listFolders({
-      database: program.database || defaultDatabasePath,
-      ...args,
-    });
+program.name("file-index").version("1.0.0");
+
+const folder: Command = program
+  .command("folder")
+  .description("管理已索引的根目录");
+
+folder
+  .command("index <path>")
+  .alias("add")
+  .description("创建或更新目录索引")
+  .action((path: string) => {
+    const { database, dryRun, ...opts } = program.opts();
+
+    return withDatabase(
+      database,
+      () => folders.index({ ...opts, path }),
+      dryRun
+    );
   });
 
-program
-  .command("add [src]")
-  .description("添加路径到索引数据库")
-  .option("--dry-run", "空运行，不操作数据库")
-  .action((args: { src: string }) =>
-    add({
-      database: program.database || defaultDatabasePath,
-      dryRun: "dry-run" in program,
-      verbose: "verbose" in program,
-      ...args,
-    })
-  );
+folder
+  .command("list")
+  .alias("ls")
+  .description("查看已索引的根目录")
+  .option("-path, --pathInclude <search>", "查询路径包含输入值的根目录")
+  .action((args: Command) => {
+    const { database, ...opts } = program.opts();
+
+    return withDatabase(database, () =>
+      folders.list({ ...opts, key: args.pathInclude })
+    );
+  });
+
+folder
+  .command("move <src> <target>")
+  .alias("mv")
+  .description("移动根目录路径")
+  .action((src: string, target: string) => {
+    const { database, dryRun, ...opts } = program.opts();
+
+    return withDatabase(
+      database,
+      () => folders.move({ ...opts, src, target }),
+      dryRun
+    );
+  });
 
 program
   .command("search [key]")
-  .description("按关键字在数据库中检索文件")
-  .action((args: { key: string }) => {
-    search({
-      database: program.database || defaultDatabasePath,
-      ...args,
-    });
+  .description("按关键字检索文件")
+  .action((key: string) => {
+    const { database, ...opts } = program.opts();
+
+    return withDatabase(database, () => files.search({ ...opts, key }));
   });
 
-program.globalOption(
-  "-db, --database",
-  "索引数据库存储路径，默认为：~/.file-index/database.db"
+program.option(
+  "-db, --database <database>",
+  "索引数据库存储路径",
+  (v: string) => v,
+  defaultDatabasePath
 );
 
-program.globalOption("--verbose", "输出调试信息");
+program.option("--verbose", "输出调试信息");
+
+program.option("--dry-run", "空运行，不写入数据库");
 
 export default program;

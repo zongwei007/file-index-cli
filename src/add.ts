@@ -1,6 +1,6 @@
 import { createStorage } from "./storage.ts";
 import { createWalker } from "./walker.ts";
-import logger from "./logger.ts";
+import * as log from "log";
 
 type AddOptions = {
   database: string;
@@ -10,8 +10,6 @@ type AddOptions = {
 };
 
 export default async function add(options: AddOptions) {
-  logger.setVerbose(!!options.verbose);
-
   const storage = await createStorage(options.database, !!options.dryRun);
   const walker = createWalker(options.src);
 

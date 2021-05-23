@@ -1,7 +1,7 @@
 import { join, normalize, basename } from "path";
 import { readLines } from "io";
+import * as log from "log";
 
-import logger from "./logger.ts";
 import { File } from "./model/mod.ts";
 
 const LINE_MATCHER = /^(\S+) (\d+) (\S+) (\S+)\s+(\d+) (\d+) ([\S\s]+)$/;
@@ -17,11 +17,11 @@ export interface Walker {
   walk: (filter: (entry: WalkEntry) => boolean) => AsyncIterableIterator<File>;
 }
 
-export function createWalker(root: string): Walker {
-  if (root.includes(":") && root.includes("@")) {
-    return new CommanderWalker(root);
-  } else {
+export async function createWalker(root: string): Promise<Walker> {
+  if (await isLocalPath(root)) {
     return new LocalWalker(root);
+  } else {
+    return new CommanderWalker(root);
   }
 }
 
@@ -29,24 +29,37 @@ class CommanderWalker implements Walker {
   host: string;
   path: string;
   root: string;
-  user: string;
+  user?: string;
 
   constructor(source: string) {
-    this.user = source.substring(0, source.indexOf("@"));
-    this.host = source.substring(this.user.length + 1, source.indexOf(":"));
+    this.user = source.includes("@")
+      ? source.substring(0, source.indexOf("@"))
+      : undefined;
+    this.host = this.user
+      ? source.substring(this.user.length + 1, source.indexOf(":"))
+      : source.substring(0, source.indexOf(":"));
     this.path = source.substring(source.indexOf(":") + 1);
+
+    if (this.path.endsWith("/")) {
+      this.path = this.path.substring(0, this.path.length - 1);
+    }
+
     this.root = this.host + ":" + this.path;
   }
 
   async *walk(
     filter: (entry: WalkEntry) => boolean
   ): AsyncIterableIterator<File> {
-    const command = `ssh ${this.user}@${this.host} sudo ls -R -l --time-style +%s ${this.path} > .swap.tmp`;
+    const fullHost = [this.user, this.host].filter(Boolean).join("@");
+    const command = `ssh ${fullHost} ls -R -l --time-style +%s ${this.path} > .swap.tmp`;
 
-    logger.debug("Execute command：%s", command);
+    log.debug(`Execute command：${command}`);
 
     const p = Deno.run({
-      cmd: ["cmd", "/C", command],
+      cmd:
+        Deno.build.os === "windows"
+          ? ["cmd", "/C", command]
+          : ["sh", "-c", command],
       stderr: "piped",
     });
 
@@ -54,71 +67,74 @@ class CommanderWalker implements Walker {
 
     p.close();
 
-    if (status.success) {
-      const fileReader = await Deno.open("./.swap.tmp");
+    try {
+      if (status.success) {
+        const fileReader = await Deno.open("./.swap.tmp");
 
-      let folderPath = this.path;
-      const ignoreFolders: string[] = [];
+        let folderPath = "";
+        const ignoreFolders: string[] = [];
 
-      for await (const line of readLines(fileReader)) {
-        if (line.startsWith(this.path) && line.endsWith(":")) {
-          folderPath = line.substring(0, line.length - 1);
-          continue;
-        } else if (line.startsWith("total ")) {
-          continue;
-        }
-
-        const groups = LINE_MATCHER.exec(line);
-
-        if (!groups) {
-          continue;
-        }
-
-        const entry = {
-          name: groups[7],
-          path: `${folderPath}/${groups[7]}`,
-          isFile: groups[1].charAt(0) === "-",
-          isDirectory: groups[1].charAt(0) === "d",
-          isSymlink: groups[1].charAt(0) === "l",
-        };
-
-        if (ignoreFolders.some((path) => entry.path.startsWith(path))) {
-          logger.debug("忽略路径 %s", entry.path);
-          continue;
-        }
-
-        if (entry.isDirectory) {
-          // 写入目录忽略信息
-          if (!filter(entry)) {
-            logger.debug("忽略路径 %s", entry.path);
-
-            ignoreFolders.push(entry.path);
+        for await (const line of readLines(fileReader)) {
+          if (line.startsWith(this.path) && line.endsWith(":")) {
+            folderPath = line.substring(this.path.length + 1, line.length - 1);
+            continue;
+          } else if (line.startsWith("total ")) {
+            continue;
           }
 
-          //仅读取文件，目录等待后续处理
-          continue;
-        }
+          const groups = LINE_MATCHER.exec(line);
 
-        if (filter(entry)) {
-          const file = new File();
-          file.size = parseInt(groups[5]);
-          file.lastModified = parseInt(groups[6]) * 1000;
-          file.name = entry.name;
-          file.path = entry.path;
+          if (!groups) {
+            continue;
+          }
 
-          yield file;
-        } else {
-          logger.debug("忽略文件 %s", entry.path);
+          const entry = {
+            name: groups[7],
+            path: folderPath.length ? `${folderPath}/${groups[7]}` : groups[7],
+            isFile: groups[1].charAt(0) === "-",
+            isDirectory: groups[1].charAt(0) === "d",
+            isSymlink: groups[1].charAt(0) === "l",
+          };
+
+          if (ignoreFolders.some((path) => entry.path.startsWith(path))) {
+            log.debug(`Ignore path ${entry.path}`);
+            continue;
+          }
+
+          if (entry.isDirectory) {
+            // 写入目录忽略信息
+            if (!filter(entry)) {
+              log.debug(`Ignore path ${entry.path}`);
+
+              ignoreFolders.push(entry.path);
+            }
+
+            //仅读取文件，目录等待后续处理
+            continue;
+          }
+
+          if (filter(entry)) {
+            const file = new File({
+              size: parseInt(groups[5]),
+              last_modified: parseInt(groups[6]) * 1000,
+              name: entry.name,
+              path: entry.path,
+            });
+
+            yield file;
+          } else {
+            log.debug(`Ignore file ${entry.path}`);
+          }
         }
+      } else {
+        const message = new TextDecoder().decode(stderr);
+        console.error("execute fail", status.code, message);
+
+        throw Error(message);
       }
-    } else {
-      const message = new TextDecoder().decode(stderr);
-      console.error("execute fail", status.code, message);
-
-      throw Error(message);
+    } finally {
+      await Deno.remove("./.swap.tmp");
     }
-
-    await Deno.remove(".swap.tmp");
   }
 }
 
@@ -154,24 +170,57 @@ async function* walkAllFiles(
       if (filter(walkEntry)) {
         yield* walkAllFiles(path, filter);
       } else {
-        logger.debug("忽略路径 %s", walkEntry.path);
+        log.debug(`Ignore path ${walkEntry.path}`);
       }
     } else if (entry.isFile) {
       if (filter(walkEntry)) {
         const filePath = normalize(path);
         const info = await Deno.stat(filePath);
 
-        const file = new File();
-
-        file.name = basename(filePath);
-        file.path = filePath;
-        file.size = info.size;
-        file.lastModified = info.mtime?.getTime();
+        const file = new File({
+          name: basename(filePath),
+          path: filePath.substring(root.length + 1),
+          size: info.size,
+          lastModified: info.mtime?.getTime() || 0,
+        });
 
         yield file;
       } else {
-        logger.debug("忽略文件 %s", walkEntry.path);
+        log.debug(`Ignore file ${walkEntry.path}`);
       }
     }
+  }
+}
+
+async function isLocalPath(path: string) {
+  if (Deno.build.os === "windows") {
+    const p = Deno.run({
+      cmd: ["wmic", "logicaldisk", "get", "deviceid"],
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const [status, std, stderr] = await Promise.all([
+      p.status(),
+      p.output(),
+      p.stderrOutput(),
+    ]);
+
+    p.close();
+
+    if (status.success) {
+      const lines = new TextDecoder().decode(std).split("\n");
+
+      return lines
+        .slice(1)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => normalize(`${line}\\`))
+        .some((line) => normalize(path).startsWith(line));
+    }
+
+    throw Error(new TextDecoder().decode(stderr));
+  } else {
+    return !path.includes(":");
   }
 }
