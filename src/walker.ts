@@ -17,6 +17,14 @@ export interface Walker {
   walk: (filter: (entry: WalkEntry) => boolean) => AsyncIterableIterator<File>;
 }
 
+export function prunePath(path: string) {
+  if (path.endsWith("/") || path.endsWith("\\")) {
+    return path.substring(0, path.length - 1);
+  }
+
+  return path;
+}
+
 export async function createWalker(root: string): Promise<Walker> {
   if (await isLocalPath(root)) {
     return new LocalWalker(root);
@@ -38,12 +46,7 @@ class CommanderWalker implements Walker {
     this.host = this.user
       ? source.substring(this.user.length + 1, source.indexOf(":"))
       : source.substring(0, source.indexOf(":"));
-    this.path = source.substring(source.indexOf(":") + 1);
-
-    if (this.path.endsWith("/")) {
-      this.path = this.path.substring(0, this.path.length - 1);
-    }
-
+    this.path = prunePath(source.substring(source.indexOf(":") + 1));
     this.root = this.host + ":" + this.path;
   }
 
@@ -51,7 +54,7 @@ class CommanderWalker implements Walker {
     filter: (entry: WalkEntry) => boolean
   ): AsyncIterableIterator<File> {
     const fullHost = [this.user, this.host].filter(Boolean).join("@");
-    const command = `ssh ${fullHost} ls -R -l --time-style +%s ${this.path} > .swap.tmp`;
+    const command = `ssh ${fullHost} ls -R -l --time-style +%s '${this.path}' > .swap.tmp`;
 
     log.debug(`Execute command：${command}`);
 
@@ -76,7 +79,12 @@ class CommanderWalker implements Walker {
 
         for await (const line of readLines(fileReader)) {
           if (line.startsWith(this.path) && line.endsWith(":")) {
-            folderPath = line.substring(this.path.length + 1, line.length - 1);
+            folderPath = line
+              .substring(0, line.length - 1)
+              .substring(this.path.length + 1);
+
+            log.debug(`Begin traverse folder ${folderPath}`);
+
             continue;
           } else if (line.startsWith("total ")) {
             continue;
