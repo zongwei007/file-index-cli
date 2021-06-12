@@ -5,6 +5,7 @@ import { File } from "../model/mod.ts";
 import type { TableColumn } from "../print.ts";
 
 type SearchOptions = {
+  folder?: string;
   keywords: string[];
 };
 
@@ -16,15 +17,18 @@ type FileOutput = {
 };
 
 export function search(options: SearchOptions) {
-  const cnds =
+  let cnds =
     new Array(options.keywords.length)
       .fill("files.path like ?")
       .join(" AND ") || undefined;
+  let param = cnds ? options.keywords.map((w) => `%${w}%`) : [];
 
-  const files = File.query(
-    cnds,
-    cnds ? options.keywords.map((w) => `%${w}%`) : undefined
-  );
+  if (options.folder) {
+    cnds = [cnds, "folders.path like ?"].filter(Boolean).join(" AND ");
+    param = param.concat([`%${options.folder}%`]);
+  }
+
+  const files = File.query(cnds, param);
 
   const outputs = files.reduce<{ [fileSetPath: string]: Array<FileOutput> }>(
     (memo, ele) => {

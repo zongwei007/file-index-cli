@@ -87,12 +87,17 @@ folder
 
 program
   .command("search [keywords...]")
+  .option("-f, --filter <folder>", "按目录路径过滤")
   .description("按关键字检索文件")
-  .action((keywords: string) => {
+  .action((keywords: string, args: Command) => {
     const { database, ...opts } = program.opts();
 
     return withDatabase(database, () => {
-      const { columns, outputs } = files.search({ ...opts, keywords });
+      const { columns, outputs } = files.search({
+        ...opts,
+        keywords,
+        folder: args.filter,
+      });
 
       return printResult(columns, outputs, opts);
     });
