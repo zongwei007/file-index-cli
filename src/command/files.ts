@@ -1,7 +1,6 @@
 import convertSize from "convert_size";
 
 import { File } from "../model/mod.ts";
-import { printTable } from "../print.ts";
 
 import type { TableColumn } from "../print.ts";
 
@@ -18,8 +17,9 @@ type FileOutput = {
 
 export function search(options: SearchOptions) {
   const cnds =
-    new Array(options.keywords.length).fill("files.path like ?").join(" AND ") ||
-    undefined;
+    new Array(options.keywords.length)
+      .fill("files.path like ?")
+      .join(" AND ") || undefined;
 
   const files = File.query(
     cnds,
@@ -67,14 +67,5 @@ export function search(options: SearchOptions) {
     },
   ];
 
-  Object.entries(outputs).forEach(([fileSetPath, files]) => {
-    console.log(fileSetPath);
-
-    printTable(columns, files);
-
-    console.log("total: %d", files.length);
-    console.log("");
-  });
-
-  return Promise.resolve();
+  return { columns, outputs };
 }

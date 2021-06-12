@@ -2,7 +2,6 @@ import convertSize from "convert_size";
 
 import { File, Folder } from "../model/mod.ts";
 import { createWalker, prunePath } from "../walker.ts";
-import { printTable } from "../print.ts";
 
 import type { TableColumn } from "../print.ts";
 
@@ -47,6 +46,20 @@ export function diff(options: DiffOptions) {
 
   const { columns: screenWidth } = Deno.consoleSize(Deno.stdout.rid);
 
+  const outputType = options.type ? [options.type] : ["add", "remove"];
+  const mapper = (type: string) => (file: File) => ({
+    type,
+    name: file.name,
+    path: file.path,
+    modifiedAt: file.lastModified,
+    size: file.size ? convertSize(file.size, { accuracy: 1 }) : "",
+  });
+
+  const rows = [
+    ...(outputType.includes("add") ? addFiles.map(mapper("add")) : []),
+    ...(outputType.includes("remove") ? removeFiles.map(mapper("remove")) : []),
+  ];
+
   const columns: TableColumn[] = [
     {
       name: "type",
@@ -70,21 +83,7 @@ export function diff(options: DiffOptions) {
     },
   ];
 
-  const outputType = options.type ? [options.type] : ["add", "remove"];
-  const mapper = (type: string) => (file: File) => ({
-    type,
-    name: file.name,
-    path: file.path,
-    modifiedAt: file.lastModified,
-    size: file.size ? convertSize(file.size, { accuracy: 1 }) : "",
-  });
-
-  printTable(columns, [
-    ...(outputType.includes("add") ? addFiles.map(mapper("add")) : []),
-    ...(outputType.includes("remove") ? removeFiles.map(mapper("remove")) : []),
-  ]);
-
-  return Promise.resolve();
+  return { columns, rows };
 }
 
 export async function index(options: IndexOptions) {
@@ -127,6 +126,12 @@ export function list(options: ListOptions) {
     `%${options.key}%`,
   ]);
 
+  const rows = folders.map((ele) => ({
+    path: ele.path,
+    createdAt: ele.createdAt,
+    modifiedAt: ele.modifiedAt,
+  }));
+
   const columns: TableColumn[] = [
     {
       name: "path",
@@ -141,16 +146,7 @@ export function list(options: ListOptions) {
     },
   ];
 
-  printTable(
-    columns,
-    folders.map((ele) => ({
-      path: ele.path,
-      createdAt: ele.createdAt,
-      modifiedAt: ele.modifiedAt,
-    }))
-  );
-
-  return Promise.resolve();
+  return { columns, rows };
 }
 
 /** 按路径获取匹配目录。匹配规则为路径一致或为目录的子目录 */

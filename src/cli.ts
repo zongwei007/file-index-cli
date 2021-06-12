@@ -5,6 +5,7 @@ import osPaths from "os_paths";
 import * as folders from "./command/folders.ts";
 import * as files from "./command/files.ts";
 import { withDatabase } from "./storage.ts";
+import { printResult } from "./print.ts";
 
 const defaultDatabasePath = join(
   osPaths.home() || ".",
@@ -41,9 +42,14 @@ folder
   .action((args: Command) => {
     const { database, ...opts } = program.opts();
 
-    return withDatabase(database, () =>
-      folders.list({ ...opts, key: args.path })
-    );
+    return withDatabase(database, () => {
+      const { columns, rows } = folders.list({
+        ...opts,
+        key: args.path,
+      });
+
+      return printResult(columns, rows, opts);
+    });
   });
 
 folder
@@ -53,9 +59,16 @@ folder
   .action((src: string, target: string, args: Command) => {
     const { database, ...opts } = program.opts();
 
-    return withDatabase(database, () =>
-      folders.diff({ ...opts, src, target, type: args.type })
-    );
+    return withDatabase(database, () => {
+      const { columns, rows } = folders.diff({
+        ...opts,
+        src,
+        target,
+        type: args.type,
+      });
+
+      return printResult(columns, rows, opts);
+    });
   });
 
 folder
@@ -78,7 +91,11 @@ program
   .action((keywords: string) => {
     const { database, ...opts } = program.opts();
 
-    return withDatabase(database, () => files.search({ ...opts, keywords }));
+    return withDatabase(database, () => {
+      const { columns, outputs } = files.search({ ...opts, keywords });
+
+      return printResult(columns, outputs, opts);
+    });
   });
 
 program.option(
@@ -87,6 +104,15 @@ program.option(
   (v: string) => v,
   defaultDatabasePath
 );
+
+program.option(
+  "--format <format>",
+  "输出格式，可选 json 或 table",
+  (v: string) => v,
+  "table"
+);
+
+program.option("-o, --output <output>", "输出文件路径");
 
 program.option("--verbose", "输出调试信息");
 
