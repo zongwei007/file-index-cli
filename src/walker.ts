@@ -4,7 +4,7 @@ import * as log from "log";
 
 import { File } from "./model/mod.ts";
 
-const LINE_MATCHER = /^(\S+) (\d+) (\S+) (\S+)\s+(\d+) (\d+) ([\S\s]+)$/;
+const LINE_MATCHER = /^(\S+) +?(\d+) (\S+) (\S+)\s+(\d+) (\d+) ([\S\s]+)$/;
 
 interface WalkEntry extends Deno.DirEntry {
   path: string;
