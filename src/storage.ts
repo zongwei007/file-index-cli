@@ -1,8 +1,8 @@
-import { DB, QueryParam } from "sqlite";
+import { DB, type QueryParameter } from "sqlite";
 import { ensureFile } from "fs";
 import * as log from "log";
 
-export type { DB, QueryParam };
+export { DB, QueryParameter };
 
 async function buildDatabase(dbPath: string): Promise<DB> {
   await ensureFile(dbPath);
@@ -21,7 +21,7 @@ async function buildDatabase(dbPath: string): Promise<DB> {
         `
         .split(";")
         .map((ele) => ele.trim())
-        .map((ele) => db.query(ele))
+        .map((ele) => db.query(ele)),
     );
 
     log.debug(`Initialize database finish`);
@@ -33,38 +33,35 @@ async function buildDatabase(dbPath: string): Promise<DB> {
 let currentDatabase: DB | null = null;
 let dryRunFlag = false;
 
-export function withDatabase<T>(
+export async function withDatabase<T>(
   dbPath: string,
   callable: (database: DB) => Promise<T>,
-  dryRun?: boolean
+  dryRun?: boolean,
 ): Promise<T> {
-  const promise = buildDatabase(dbPath).then((database) => {
-    log.debug(`Begin transaction`);
+  const database = await buildDatabase(dbPath);
 
-    dryRunFlag = !!dryRun;
-    database.query("BEGIN");
-    return (currentDatabase = database);
-  });
+  log.debug(`Begin transaction`);
+  dryRunFlag = !!dryRun;
 
-  return promise
-    .then(callable)
-    .then((result: T) => {
-      log.debug(`Commit transaction`);
+  database.query("BEGIN");
+  currentDatabase = database;
 
-      currentDatabase?.query("COMMIT");
-      return result;
-    })
-    .catch((error) => {
-      log.debug(`Rollback transaction`);
+  try {
+    const result = await callable(database);
 
-      currentDatabase?.query("ROLLBACK");
-      throw error;
-    })
-    .finally(() => {
-      currentDatabase?.close();
-      currentDatabase = null;
-      dryRunFlag = false;
-    });
+    log.debug(`Commit transaction`);
+    database.query("COMMIT");
+    return result;
+  } catch (e) {
+    log.debug(`Rollback transaction`);
+
+    database.query("ROLLBACK");
+    throw e;
+  } finally {
+    database.close(true);
+    currentDatabase = null;
+    dryRunFlag = false;
+  }
 }
 
 export function getDatabase() {

@@ -1,4 +1,4 @@
-import convertSize from "convert_size";
+import convert from "convert_pro";
 
 import { File, Folder } from "../model/mod.ts";
 import { createWalker, prunePath } from "../walker.ts";
@@ -39,12 +39,12 @@ export function diff(options: DiffOptions) {
 
   const srcPath = prunePath(options.src.substring(src.path.length + 1));
   const targetPath = prunePath(
-    options.target.substring(target.path.length + 1)
+    options.target.substring(target.path.length + 1),
   );
 
   const [addFiles, removeFiles] = src.diff(target, srcPath, targetPath);
 
-  const { columns: screenWidth } = Deno.consoleSize(Deno.stdout.rid);
+  const { columns: screenWidth } = Deno.consoleSize();
 
   const outputType = options.type ? [options.type] : ["add", "remove"];
   const mapper = (type: string) => (file: File) => ({
@@ -52,7 +52,7 @@ export function diff(options: DiffOptions) {
     name: file.name,
     path: file.path,
     modifiedAt: file.lastModified,
-    size: file.size ? convertSize(file.size, { accuracy: 1 }) : "",
+    size: file.size ? convert.bytes(file.size, { accuracy: 1 }) : "",
   });
 
   const rows = [
@@ -99,12 +99,12 @@ export async function index(options: IndexOptions) {
   await folder!.sync(
     // 'ab/cd'.substring('ab'.length + 1) => cd
     walker.root.substring(folder.path.length + 1),
-    walker.walk(({ name }) => !name.startsWith(".") && name !== "node_modules")
+    walker.walk(({ name }) => !name.startsWith(".") && name !== "node_modules"),
   );
 }
 
 export async function move(options: MoveOptions) {
-  const [src] = Folder.query("path = ?", [options.src]);
+  const [src] = Folder.query([["path", options.src]]);
 
   if (!src) {
     throw new Error(`Folder ${options.src} is not found`);
@@ -122,9 +122,9 @@ export async function move(options: MoveOptions) {
 }
 
 export function list(options: ListOptions) {
-  const folders = Folder.query(options.key ? "path like ?" : undefined, [
-    `%${options.key}%`,
-  ]);
+  const folders = options.key
+    ? Folder.query([["path", "LIKE", `%${options.key}%`]])
+    : Folder.query();
 
   const rows = folders.map((ele) => ({
     path: ele.path,

@@ -1,6 +1,6 @@
 import * as log from "log";
 
-import { getDatabase, isDryRun, QueryParam } from "../storage.ts";
+import { getDatabase, isDryRun, type QueryParameter } from "../storage.ts";
 import File from "./File.ts";
 
 class Folder {
@@ -20,22 +20,37 @@ class Folder {
   }
 
   static query(
-    cnd?: string,
-    param?: Record<string, QueryParam> | QueryParam[]
+    param?: Array<[string, QueryParameter] | [string, string, QueryParameter]>,
   ): Folder[] {
-    const sql =
-      "SELECT id, path, created_at, modified_at FROM folders" +
-      (cnd ? " WHERE " + cnd : "");
+    let sql = "SELECT id, path, created_at, modified_at FROM folders";
+    const values: Record<string, QueryParameter> = {};
 
-    log.debug(`Query folders by ${sql}; Param: ${cnd && param}`);
+    if (param?.length) {
+      sql = " WHERE " + param.map(([field, op, val], i) => {
+        const key = `${field}_${i}`;
 
-    const rows = [
-      ...getDatabase()
-        .query(sql, cnd ? param : undefined)
-        .asObjects(),
-    ];
+        if (val) {
+          values[key] = val;
+          return `${field} ${op} :${key}}`;
+        } else {
+          values[key] = val = op;
+          return `${field} = :${key}`;
+        }
+      }).join(" AND ");
+    }
 
-    return rows.map((ele) => new Folder(ele));
+    log.debug(`Query folders by ${sql}; Param: ${JSON.stringify(values)}`);
+
+    const query = getDatabase().prepareQuery<[number, string, string, string], {
+      id: number;
+      path: string;
+      created_at: number;
+      modified_at: number;
+    }>(sql);
+
+    const rows = param ? query.allEntries(values) : query.allEntries();
+
+    return rows.map((row) => new Folder(row));
   }
 
   isChild(path: string) {
@@ -55,8 +70,8 @@ class Folder {
   }
 
   findChildren(): Folder[] {
-    return Folder.query("PATH like ?", [
-      this.path + this.pathSeparator() + "%",
+    return Folder.query([
+      ["path", "LIKE", this.path + this.pathSeparator() + "%"],
     ]);
   }
 
@@ -66,14 +81,14 @@ class Folder {
       return memo;
     };
 
-    const srcFiles = File.query("folder_id = ? AND files.path like ?", [
-      this.id,
-      `${srcPath}%`,
+    const srcFiles = File.query([
+      ["folder_id", this.id],
+      ["path", "LIKE", `${srcPath}%`],
     ]).reduce(reducer(srcPath), new Map<string, File>());
 
-    const targetFiles = File.query("folder_id = ? AND files.path like ?", [
-      target.id,
-      `${targetPath}%`,
+    const targetFiles = File.query([
+      ["folder_id", target.id],
+      ["path", "LIKE", `${targetPath}%`],
     ]).reduce(reducer(targetPath), new Map<string, File>());
 
     const addFiles = [];
@@ -97,17 +112,27 @@ class Folder {
   }
 
   merge(...folders: Folder[]) {
-    const sql = `UPDATE files SET path = (? || ? || path), folder_id = ? WHERE folder_id = ?`;
-    const updater = getDatabase().prepareQuery(sql);
+    const sql =
+      `UPDATE files SET path = :prefix || path, folder_id = :id WHERE folder_id = :folderId`;
+
+    const updater = getDatabase().prepareQuery<
+      [number],
+      never,
+      { prefix: string; id: number; folderId: number }
+    >(sql);
 
     for (const folder of folders) {
       const subpath = folder.path.substring(this.path.length + 1);
-      const sqlParams = [subpath, folder.pathSeparator(), this.id, folder.id];
+      const sqlParams = {
+        prefix: subpath + folder.pathSeparator(),
+        id: this.id,
+        folderId: folder.id,
+      };
 
-      log.debug(`Update files by ${sql}; Param: ${sqlParams}`);
+      log.debug(`Update files by ${sql}; Param: ${JSON.stringify(sqlParams)}`);
 
       if (!isDryRun()) {
-        updater(sqlParams);
+        updater.execute(sqlParams);
       }
     }
 
@@ -149,7 +174,7 @@ class Folder {
 
       database.query(
         `UPDATE folders SET path = (?), modified_at = (?) WHERE id = ?`,
-        [this.path, this.modifiedAt.getTime(), this.id]
+        [this.path, this.modifiedAt.getTime(), this.id],
       );
     } else {
       log.debug(`Create folder ${this.path}`);
@@ -158,7 +183,7 @@ class Folder {
 
       database.query(
         `INSERT INTO folders(path, created_at, modified_at) VALUES (?,?,?)`,
-        [this.path, this.createdAt.getTime(), this.modifiedAt.getTime()]
+        [this.path, this.createdAt.getTime(), this.modifiedAt.getTime()],
       );
 
       this.id = database.lastInsertRowId;
@@ -166,9 +191,9 @@ class Folder {
   }
 
   private addFile(file: File) {
-    let [result] = File.query("files.path = ? AND folder_id = ?", [
-      file.path,
-      this.id,
+    let [result] = File.query([
+      ["folder_id", this.id],
+      ["path", file.path],
     ]);
 
     if (result) {
@@ -197,10 +222,10 @@ class Folder {
 
   private clearFiles(parent: string, includes: string[]) {
     const exists = new Set(
-      File.query("files.path like ? AND folder_id = ?", [
-        parent + "/%",
-        this.id,
-      ]).map((ele) => ele.path)
+      File.query([
+        ["folder_id", this.id],
+        ["path", "LIKE", parent + "/%"],
+      ]).map((ele) => ele.path),
     );
 
     includes.forEach((ele) => exists.delete(ele));
@@ -216,7 +241,7 @@ class Folder {
 
       database.query(
         `DELETE FROM files WHERE folder_id = ? AND path in (${placeholder})`,
-        [this.id, ...paths]
+        [this.id, ...paths],
       );
     }
   }

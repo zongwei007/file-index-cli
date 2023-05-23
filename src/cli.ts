@@ -9,7 +9,7 @@ import { printResult } from "./print.ts";
 
 const defaultDatabasePath = join(
   osPaths.home() || ".",
-  ".file-index/database.db"
+  ".file-index/database.db",
 );
 
 const program = new Command();
@@ -30,7 +30,7 @@ folder
     return withDatabase(
       database,
       () => folders.index({ ...opts, path }),
-      dryRun
+      dryRun,
     );
   });
 
@@ -81,7 +81,7 @@ folder
     return withDatabase(
       database,
       () => folders.move({ ...opts, src, target }),
-      dryRun
+      dryRun,
     );
   });
 
@@ -107,14 +107,14 @@ program.option(
   "-db, --database <database>",
   "索引数据库存储路径",
   (v: string) => v,
-  defaultDatabasePath
+  defaultDatabasePath,
 );
 
 program.option(
   "--format <format>",
   "输出格式，可选 json 或 table",
   (v: string) => v,
-  "table"
+  "table",
 );
 
 program.option("-o, --output <output>", "输出文件路径");

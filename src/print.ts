@@ -15,9 +15,9 @@ export type TableColumn = {
 export function printTable<T extends TableRow>(
   columns: TableColumn[],
   data: T[],
-  println: (text: string) => void
+  println: (text: string) => void,
 ) {
-  const { columns: screenWidth } = Deno.consoleSize(Deno.stdout.rid);
+  const { columns: screenWidth } = Deno.consoleSize();
 
   const mapper = (column: TableColumn, row: T): Column => {
     let content = row[column.name];
@@ -50,8 +50,8 @@ export function printTable<T extends TableRow>(
         {
           width: screenWidth,
           paddingMiddle: " | ",
-        }
-      )
+        },
+      ),
     );
 
     if (index < array.length - 1) {
@@ -65,7 +65,7 @@ export function printTable<T extends TableRow>(
 export function printResult<T extends TableRow>(
   columns: TableColumn[],
   rows: T[] | Record<string, T[]>,
-  { format, output }: { format?: "table" | "json"; output?: string }
+  { format, output }: { format?: "table" | "json"; output?: string },
 ) {
   let println = console.log;
 

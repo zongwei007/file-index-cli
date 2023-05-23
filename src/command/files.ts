@@ -1,4 +1,4 @@
-import convertSize from "convert_size";
+import convert from "convert_pro";
 
 import { File } from "../model/mod.ts";
 
@@ -17,18 +17,15 @@ type FileOutput = {
 };
 
 export function search(options: SearchOptions) {
-  let cnds =
-    new Array(options.keywords.length)
-      .fill("files.path like ?")
-      .join(" AND ") || undefined;
-  let param = cnds ? options.keywords.map((w) => `%${w}%`) : [];
+  let cnds = options.keywords.map<[string, string, string]>((
+    w,
+  ) => ["path", "LIKE", `%${w}%`]);
 
   if (options.folder) {
-    cnds = [cnds, "folders.path like ?"].filter(Boolean).join(" AND ");
-    param = param.concat([`%${options.folder}%`]);
+    cnds = cnds.concat(["folders.path", "LIKE", `%${options.folder}%`]);
   }
 
-  const files = File.query(cnds, param);
+  const files = File.query(cnds);
 
   const outputs = files.reduce<{ [fileSetPath: string]: Array<FileOutput> }>(
     (memo, ele) => {
@@ -42,15 +39,15 @@ export function search(options: SearchOptions) {
         name: ele.name,
         path: ele.path,
         modifiedAt: ele.lastModified,
-        size: ele.size ? convertSize(ele.size, { accuracy: 1 }) : undefined,
+        size: ele.size ? convert.bytes(ele.size, { accuracy: 1 }) : undefined,
       });
 
       return memo;
     },
-    {}
+    {},
   );
 
-  const { columns: screenWidth } = Deno.consoleSize(Deno.stdout.rid);
+  const { columns: screenWidth } = Deno.consoleSize();
 
   const columns: TableColumn[] = [
     {

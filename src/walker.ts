@@ -1,4 +1,4 @@
-import { join, normalize, basename } from "path";
+import { basename, join, normalize } from "path";
 import { readLines } from "io";
 import * as log from "log";
 
@@ -51,27 +51,25 @@ class CommanderWalker implements Walker {
   }
 
   async *walk(
-    filter: (entry: WalkEntry) => boolean
+    filter: (entry: WalkEntry) => boolean,
   ): AsyncIterableIterator<File> {
     const fullHost = [this.user, this.host].filter(Boolean).join("@");
-    const command = `ssh ${fullHost} ls -R -l --time-style +%s '${this.path}' > .swap.tmp`;
+    const command =
+      `ssh ${fullHost} ls -R -l --time-style +%s '${this.path}' > ./.swap.tmp`;
 
     log.debug(`Execute command：${command}`);
 
-    const p = Deno.run({
-      cmd:
-        Deno.build.os === "windows"
-          ? ["cmd", "/C", command]
-          : ["sh", "-c", command],
-      stderr: "piped",
-    });
+    const processor = new Deno.Command(
+      Deno.build.os === "windows" ? "cmd" : "sh",
+      {
+        args: Deno.build.os === "windows" ? ["/C", command] : ["-c", command],
+      },
+    );
 
-    const [status, stderr] = await Promise.all([p.status(), p.stderrOutput()]);
-
-    p.close();
+    const { code, stderr } = await processor.output();
 
     try {
-      if (status.success) {
+      if (code === 0) {
         const fileReader = await Deno.open("./.swap.tmp");
 
         let folderPath = "";
@@ -136,7 +134,7 @@ class CommanderWalker implements Walker {
         }
       } else {
         const message = new TextDecoder().decode(stderr);
-        console.error("execute fail", status.code, message);
+        console.error("execute fail", code, message);
 
         throw Error(message);
       }
@@ -155,7 +153,7 @@ class LocalWalker implements Walker {
   }
 
   async *walk(
-    filter: (entry: WalkEntry) => boolean
+    filter: (entry: WalkEntry) => boolean,
   ): AsyncIterableIterator<File> {
     yield* walkAllFiles(this.root, filter);
   }
@@ -163,7 +161,7 @@ class LocalWalker implements Walker {
 
 async function* walkAllFiles(
   root: string,
-  filter: (entry: WalkEntry) => boolean
+  filter: (entry: WalkEntry) => boolean,
 ): AsyncIterableIterator<File> {
   for await (const entry of Deno.readDir(root)) {
     const path = join(root, entry.name);
@@ -202,22 +200,16 @@ async function* walkAllFiles(
 
 async function isLocalPath(path: string) {
   if (Deno.build.os === "windows") {
-    const p = Deno.run({
-      cmd: ["wmic", "logicaldisk", "get", "deviceid"],
+    const command = new Deno.Command("wmic", {
+      args: ["logicaldisk", "get", "deviceid"],
       stdout: "piped",
       stderr: "piped",
     });
 
-    const [status, std, stderr] = await Promise.all([
-      p.status(),
-      p.output(),
-      p.stderrOutput(),
-    ]);
+    const { code, stdout, stderr } = await command.output();
 
-    p.close();
-
-    if (status.success) {
-      const lines = new TextDecoder().decode(std).split("\n");
+    if (code === 0) {
+      const lines = new TextDecoder().decode(stdout).split("\n");
 
       return lines
         .slice(1)
